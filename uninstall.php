@@ -1,0 +1,1 @@
+<?php // Optional: implement full cleanup if needed

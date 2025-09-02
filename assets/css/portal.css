@@ -1,0 +1,4 @@
+.aff-portal { background:#fff; border:1px solid #eee; border-radius:16px; padding:16px; }
+.aff-tablist { display:flex; gap:12px; list-style:none; padding:0; margin:0 0 12px 0; flex-wrap:wrap; }
+.aff-tablist a { display:block; padding:8px 12px; border:1px solid #e5e7eb; border-radius:999px; text-decoration:none; }
+.aff-portal section { border-top:1px dashed #e5e7eb; padding-top:12px; margin-top:12px; }

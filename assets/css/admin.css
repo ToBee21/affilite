@@ -1,0 +1,4 @@
+.aff-wrap .aff-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.aff-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.aff-card h2 { margin-top:0; }
+@media (max-width: 900px){ .aff-wrap .aff-grid { grid-template-columns:1fr; } }

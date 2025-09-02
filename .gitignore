@@ -1,0 +1,15 @@
+# System
+.DS_Store
+Thumbs.db
+
+# Build / vendor (na później)
+node_modules/
+vendor/
+
+# Zips i cache
+*.zip
+*.log
+*.cache
+
+# VS Code / lokalne deploye
+.vscode/sftp.json
