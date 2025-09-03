@@ -8,16 +8,20 @@ class Plugin {
         // i18n
         load_plugin_textdomain( 'affilite', false, dirname( plugin_basename( AFFILITE_FILE ) ) . '/languages' );
 
-        // Role
+        // Role + Ustawienia
         (new Roles())->register();
+        (new Settings())->register();
 
-        // Admin
+        // Admin menu
         if ( is_admin() ) {
             (new Admin())->hooks();
         }
 
-        // Shortcode
+        // Shortcode portalu
         (new Shortcode())->register();
+
+        // Tracking: /ref/{kod}, cookie, klik, referral
+        (new Tracking())->hooks();
 
         // Assety
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_front_assets' ] );
