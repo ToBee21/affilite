@@ -74,8 +74,9 @@ class Admin {
     }
 
     public function render_dashboard() : void {
-        echo '<div class="wrap"><h1>AffiLite — Dashboard</h1><p>Wkrótce…</p></div>';
-    }
+    (new Dashboard())->render();
+}
+
 
     public function render_settings_bridge() : void {
         (new Settings())->render_settings();
