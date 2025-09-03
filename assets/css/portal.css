@@ -9,3 +9,6 @@
 .aff-tabpanel.is-active { display:block; }
 .aff-link-form .aff-generate { padding:8px 12px; cursor:pointer; }
 .aff-hint { font-size:12px; color:#666; }
+.aff-card { padding:12px 14px; border:1px solid rgba(0,0,0,.08); border-radius:8px; background:#fff; }
+.aff-card h3 { margin:0 0 6px 0; font-size:12px; color:#666; font-weight:600; }
+.aff-payout-form input, .aff-payout-form select { width:100%; max-width:420px; margin:4px 0; }

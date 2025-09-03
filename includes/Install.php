@@ -19,6 +19,7 @@ class Install {
         $partners  = $wpdb->prefix . 'aff_partners';
         $clicks    = $wpdb->prefix . 'aff_clicks';
         $referrals = $wpdb->prefix . 'aff_referrals';
+        $payouts   = $wpdb->prefix . 'aff_payouts';
 
         $sql = [];
 
@@ -69,6 +70,22 @@ CREATE TABLE {$referrals} (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY order_unique (order_id),
+  KEY partner_idx (partner_id),
+  KEY status_idx (status)
+) {$charset};
+SQL;
+
+        $sql[] = <<<SQL
+CREATE TABLE {$payouts} (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  partner_id BIGINT UNSIGNED NOT NULL,
+  amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+  method VARCHAR(20) NOT NULL,
+  details_json LONGTEXT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending|processing|paid|rejected
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
   KEY partner_idx (partner_id),
   KEY status_idx (status)
 ) {$charset};

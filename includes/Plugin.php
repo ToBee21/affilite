@@ -16,7 +16,8 @@ class Plugin {
 
         (new Shortcode())->register();
         (new Tracking())->hooks();
-        (new Referrals())->hooks(); // <-- NOWE
+        (new Referrals())->hooks();
+        (new Payouts())->hooks(); // <— NOWE
 
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_front_assets' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );

@@ -7,10 +7,15 @@ class Admin {
 
     public function hooks() : void {
         add_action('admin_menu', [ $this, 'menu' ]);
+
+        if ( is_admin() ) {
+            (new AdminOrders())->hooks();
+            (new AdminPayouts())->hooks(); // już było
+            (new AdminPartners())->hooks(); // <-- NOWE (panel Afilianci)
+        }
     }
 
     public function menu() : void {
-        // Główne menu AffiLite
         add_menu_page(
             'AffiLite',
             'AffiLite',
@@ -21,7 +26,6 @@ class Admin {
             56
         );
 
-        // Dashboard (alias, żeby pierwszy submenu nie znikał)
         add_submenu_page(
             'affilite',
             'Dashboard',
@@ -31,7 +35,34 @@ class Admin {
             [ $this, 'render_dashboard' ]
         );
 
-        // Ustawienia (-> admin.php?page=affilite-settings)
+        add_submenu_page(
+            'affilite',
+            'Zamówienia',
+            'Zamówienia',
+            'manage_options',
+            'affilite-orders',
+            [ $this, 'render_orders_bridge' ]
+        );
+
+        add_submenu_page(
+            'affilite',
+            'Wypłaty',
+            'Wypłaty',
+            'manage_options',
+            'affilite-payouts',
+            [ $this, 'render_payouts_bridge' ]
+        );
+
+        // <-- NOWE: Afilianci
+        add_submenu_page(
+            'affilite',
+            'Afilianci',
+            'Afilianci',
+            'manage_options',
+            'affilite-partners',
+            [ $this, 'render_partners_bridge' ]
+        );
+
         add_submenu_page(
             'affilite',
             'Ustawienia',
@@ -46,8 +77,20 @@ class Admin {
         echo '<div class="wrap"><h1>AffiLite — Dashboard</h1><p>Wkrótce…</p></div>';
     }
 
-    // Mostek do widoku ustawień
     public function render_settings_bridge() : void {
         (new Settings())->render_settings();
+    }
+
+    public function render_orders_bridge() : void {
+        (new AdminOrders())->render();
+    }
+
+    public function render_payouts_bridge() : void {
+        (new AdminPayouts())->render();
+    }
+
+    // <-- NOWE: mostek do widoku „Afilianci”
+    public function render_partners_bridge() : void {
+        (new AdminPartners())->render();
     }
 }
