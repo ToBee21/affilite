@@ -5,25 +5,19 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class Plugin {
     public function init() : void {
-        // i18n
         load_plugin_textdomain( 'affilite', false, dirname( plugin_basename( AFFILITE_FILE ) ) . '/languages' );
 
-        // Role + Ustawienia
         (new Roles())->register();
         (new Settings())->register();
 
-        // Admin menu
         if ( is_admin() ) {
             (new Admin())->hooks();
         }
 
-        // Shortcode portalu
         (new Shortcode())->register();
-
-        // Tracking: /ref/{kod}, cookie, klik, referral
         (new Tracking())->hooks();
+        (new Referrals())->hooks(); // <-- NOWE
 
-        // Assety
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_front_assets' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
     }

@@ -9,23 +9,18 @@ class Tracking {
         add_action('init', [ $this, 'add_rewrite' ]);
         add_filter('query_vars', [ $this, 'query_vars' ]);
         add_action('template_redirect', [ $this, 'handle_ref_link' ]);
-
         add_action('woocommerce_checkout_order_processed', [ $this, 'on_order_processed' ], 10, 3);
     }
 
     public function add_rewrite() : void {
         add_rewrite_rule('^ref/([^/]+)/?$', 'index.php?aff_code=$matches[1]', 'top');
     }
+    public function query_vars($vars) { $vars[] = 'aff_code'; return $vars; }
 
-    public function query_vars($vars) {
-        $vars[] = 'aff_code';
-        return $vars;
-    }
-
+    /** Obsługa /ref/{kod}?to=/sciezka lub ?url=PELNY_URL (ta sama domena) */
     public function handle_ref_link() : void {
         $code = get_query_var('aff_code');
         if ( empty($code) ) { return; }
-
         $code = sanitize_title( wp_unslash($code) );
 
         global $wpdb;
@@ -44,14 +39,14 @@ class Tracking {
         $opts = get_option(Settings::OPTION_KEY, Settings::defaults());
         $ttl_days = max(0, (int)($opts['cookie_ttl'] ?? 30));
         $expire   = time() + $ttl_days * DAY_IN_SECONDS;
-        $secure   = is_ssl();
-        $httponly = true;
 
-        setcookie('aff_code', $code, $expire, COOKIEPATH ?: '/', COOKIE_DOMAIN, $secure, $httponly);
+        // Ustawiamy cookie *raz*, w nowej wersji API
+        setcookie('aff_code', $code, $expire, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
         if ( COOKIEPATH !== SITECOOKIEPATH ) {
-            setcookie('aff_code', $code, $expire, SITECOOKIEPATH ?: '/', COOKIE_DOMAIN, $secure, $httponly);
+            setcookie('aff_code', $code, $expire, SITECOOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
         }
 
+        // Lekki log kliknięcia (hash IP/UA)
         $ip  = $_SERVER['REMOTE_ADDR'] ?? '';
         $ua  = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $ip_hash = $ip ? hash('sha256', wp_salt('auth').'|'.$ip) : null;
@@ -69,6 +64,68 @@ class Tracking {
 
         $this->redirect($dest);
     }
+
+    /** Tworzenie wstępnego referral przy złożeniu zamówienia */
+    public function on_order_processed( $order_id, $posted_data, $order ) : void {
+        if ( ! class_exists('WooCommerce') || ! $order_id ) { return; }
+
+        $code = isset($_COOKIE['aff_code']) ? sanitize_title( wp_unslash($_COOKIE['aff_code']) ) : '';
+        if ( empty($code) ) { return; }
+
+        global $wpdb;
+        $partners  = $wpdb->prefix . 'aff_partners';
+        $referrals = $wpdb->prefix . 'aff_referrals';
+
+        $partner = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id, user_id, status, commission_rate FROM $partners WHERE code = %s LIMIT 1", $code
+        ) );
+        if ( ! $partner || $partner->status !== 'approved' ) { return; }
+
+        $opts = get_option(Settings::OPTION_KEY, Settings::defaults());
+        $deny_self = empty($opts['allow_self_purchase']); // domyślnie blokujemy samozakup
+
+        // Samozakup?
+        $order_user_id   = (int) $order->get_user_id();
+        $order_email     = (string) $order->get_billing_email();
+        $affiliate_user  = get_userdata( (int)$partner->user_id );
+        $affiliate_email = $affiliate_user ? (string) $affiliate_user->user_email : '';
+
+        if ( $deny_self && ( $order_user_id === (int)$partner->user_id || strcasecmp($order_email, $affiliate_email) === 0 ) ) {
+            $wpdb->insert($referrals, [
+                'order_id'          => (int)$order_id,
+                'partner_id'        => (int)$partner->id,
+                'order_total'       => (float)$order->get_total(),
+                'commission_amount' => 0,
+                'status'            => 'rejected',
+                'locked_until'      => null,
+                'reason'            => 'self_purchase',
+            ], [ '%d','%d','%f','%f','%s','%s','%s' ]);
+            return;
+        }
+
+        $rate = $partner->commission_rate !== null ? (float)$partner->commission_rate : (float)($opts['commission_rate'] ?? 10);
+        $total = (float) $order->get_total();
+        $commission = round( $total * ($rate/100), wc_get_price_decimals() );
+
+        $lock_days = max(0, (int)($opts['lock_days'] ?? 14));
+        $locked_until = $lock_days > 0 ? gmdate('Y-m-d H:i:s', time() + $lock_days * DAY_IN_SECONDS) : null;
+
+        $wpdb->insert($referrals, [
+            'order_id'          => (int)$order_id,
+            'partner_id'        => (int)$partner->id,
+            'order_total'       => $total,
+            'commission_amount' => $commission,
+            'status'            => 'pending',
+            'locked_until'      => $locked_until,
+            'reason'            => null,
+        ], [ '%d','%d','%f','%f','%s','%s','%s' ]);
+
+        if ( $locked_until ) {
+            wp_schedule_single_event( strtotime($locked_until), 'affilite_maybe_approve_referral', [ (int)$order_id ] );
+        }
+    }
+
+    /* ====================== helpers ====================== */
 
     private function resolve_destination() : string {
         $home = home_url('/');
@@ -97,42 +154,7 @@ class Tracking {
         exit;
     }
 
-    public function on_order_processed( $order_id, $posted_data, $order ) : void {
-        if ( ! class_exists('WooCommerce') ) { return; }
-        if ( ! $order_id ) { return; }
-
-        $code = isset($_COOKIE['aff_code']) ? sanitize_title( wp_unslash($_COOKIE['aff_code']) ) : '';
-        if ( empty($code) ) { return; }
-
-        global $wpdb;
-        $partners  = $wpdb->prefix . 'aff_partners';
-        $referrals = $wpdb->prefix . 'aff_referrals';
-
-        $partner = $wpdb->get_row( $wpdb->prepare(
-            "SELECT id, status, commission_rate FROM $partners WHERE code = %s LIMIT 1", $code
-        ) );
-        if ( ! $partner || $partner->status !== 'approved' ) { return; }
-
-        $opts = get_option(Settings::OPTION_KEY, Settings::defaults());
-        $rate = $partner->commission_rate !== null ? (float)$partner->commission_rate : (float)($opts['commission_rate'] ?? 10);
-
-        $order_obj = wc_get_order($order_id);
-        $total = (float) $order_obj->get_total();
-        $commission = round( $total * ($rate/100), wc_get_price_decimals() );
-
-        $lock_days = max(0, (int)($opts['lock_days'] ?? 14));
-        $locked_until = $lock_days > 0 ? gmdate('Y-m-d H:i:s', time() + $lock_days * DAY_IN_SECONDS) : null;
-
-        $wpdb->insert($referrals, [
-            'order_id'          => (int)$order_id,
-            'partner_id'        => (int)$partner->id,
-            'order_total'       => $total,
-            'commission_amount' => $commission,
-            'status'            => 'pending',
-            'locked_until'      => $locked_until,
-        ], [ '%d','%d','%f','%f','%s','%s' ]);
-    }
-
+    /** Upewnia się, że user ma rekord partnera (używane w portalu) */
     public static function ensure_partner_for_user( int $user_id ) : ?object {
         if ( $user_id <= 0 ) return null;
         global $wpdb;

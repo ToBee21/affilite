@@ -6,22 +6,21 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class Settings {
     public const OPTION_KEY = 'affilite_options';
 
-    /** Domyślne wartości (zgodne z Twoimi ustaleniami) */
     public static function defaults() : array {
         return [
-            'commission_rate' => 10,   // %
-            'lock_days'       => 14,   // dni blokady na zwroty
-            'cookie_ttl'      => 30,   // dni życia cookie
+            'commission_rate' => 10,
+            'lock_days'       => 14,
+            'cookie_ttl'      => 30,
             'join_mode'       => 'auto',   // 'auto' | 'manual'
             'attribution'     => 'last',   // 'last' | 'first'
             'cross_device'    => true,
+            'allow_self_purchase' => false, // NOWE: blokuj samozakup (domyślnie)
             'payout_methods'  => [ 'paypal' => true, 'bank' => true, 'crypto' => true ],
             'min_payout'      => 100.0,
             'fraud_thresholds'=> [ 'clicks_day' => 500, 'conv_day' => 20, 'commission_day' => 1000.0 ],
         ];
     }
 
-    /** Rejestracja opcji (bez tworzenia menu — to robi Admin.php) */
     public function register() : void {
         $opts = get_option(self::OPTION_KEY);
         if (!is_array($opts)) {
@@ -32,7 +31,6 @@ class Settings {
         register_setting('affilite_settings', self::OPTION_KEY, [ $this, 'sanitize' ]);
     }
 
-    /** Walidacja danych z formularza */
     public function sanitize($input) : array {
         $d = self::defaults();
         $o = $d;
@@ -48,6 +46,7 @@ class Settings {
         $o['attribution'] = in_array($a, ['last','first'], true) ? $a : 'last';
 
         $o['cross_device'] = !empty($input['cross_device']);
+        $o['allow_self_purchase'] = !empty($input['allow_self_purchase']);
 
         $o['payout_methods'] = [
             'paypal' => !empty($input['payout_methods']['paypal']),
@@ -66,12 +65,10 @@ class Settings {
         return $o;
     }
 
-    /** Mały helper do ładnych boxów */
     private function card(string $title, string $html) : void {
         echo '<div class="aff-card"><h2>'.esc_html($title).'</h2><div>'.$html.'</div></div>';
     }
 
-    /** Widok strony ustawień (wywoływany z Admin::render_settings_bridge) */
     public function render_settings() : void {
         $o = get_option(self::OPTION_KEY, self::defaults());
 
@@ -127,7 +124,8 @@ class Settings {
         ob_start();
         printf('<label><input type="checkbox" name="%1$s[cross_device]" %2$s> Śledzenie między urządzeniami (dla zalogowanych)</label><br>',
             esc_attr(self::OPTION_KEY), checked(!empty($o['cross_device']),true,false));
-        echo '<p>Na MVP: cookie + last-click. Fingerprint/IP dodamy później (hashowane, zgodnie z RODO).</p>';
+        printf('<label><input type="checkbox" name="%1$s[allow_self_purchase]" %2$s> Zezwól na zakupy przez własny link (NIEZALECANE)</label><br>',
+            esc_attr(self::OPTION_KEY), checked(!empty($o['allow_self_purchase']),true,false));
         $this->card('Śledzenie i bezpieczeństwo', ob_get_clean());
 
         // Progi anty-fraud
@@ -140,7 +138,7 @@ class Settings {
             esc_attr(self::OPTION_KEY), esc_attr($o['fraud_thresholds']['commission_day']));
         $this->card('Progi anty-fraud', ob_get_clean());
 
-        echo '</div>'; // .aff-grid
+        echo '</div>';
         submit_button();
         echo '</form></div>';
     }
