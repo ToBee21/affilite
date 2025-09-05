@@ -206,6 +206,7 @@ class AdminPayouts {
 
         foreach ( $ids as $id ) {
             $wpdb->update( $t, [ 'status'=>$do, 'updated_at'=>$now ], [ 'id'=>$id ], [ '%s','%s' ], [ '%d' ] );
+            \AffiLite\Mailer::affiliate_payout_status( (int)$id );
         }
 
         wp_redirect( add_query_arg('msg','updated', admin_url('admin.php?page=affilite-payouts')) ); exit;

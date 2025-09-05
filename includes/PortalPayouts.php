@@ -94,7 +94,7 @@ class PortalPayouts {
             'created_at'   => current_time('mysql', true),
             'updated_at'   => current_time('mysql', true),
         ], [ '%d','%f','%s','%s','%s','%s','%s' ] );
-
+        \AffiLite\Mailer::admin_new_payout( $partner_id, $amount, $method );
         echo '<div class="notice notice-success"><p>Wniosek o wypłatę złożony.</p></div>';
     }
 
