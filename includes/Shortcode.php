@@ -17,7 +17,7 @@ class Shortcode {
             'dashboard' => 'Dashboard',
             'orders'    => 'Zamówienia',
             'payouts'   => 'Wypłaty',
-            'materials' => 'Materiały promocyjne', // <-- ta zakładka
+            'materials' => 'Materiały promocyjne',
             'link'      => 'Generator linku',
             'settings'  => 'Ustawienia',
         ];
@@ -28,16 +28,6 @@ class Shortcode {
             : null;
 
         $base_link = $partner ? home_url('/ref/' . rawurlencode($partner->code) . '/') : '';
-
-        // Dane do wypłat
-        $opts = get_option(Settings::OPTION_KEY, Settings::defaults());
-        $allowed_methods = [
-            'paypal' => !empty($opts['payout_methods']['paypal']),
-            'bank'   => !empty($opts['payout_methods']['bank']),
-            'crypto' => !empty($opts['payout_methods']['crypto']),
-        ];
-        $min_payout = (float)($opts['min_payout'] ?? 0);
-        $balance = $partner ? \AffiLite\Payouts::get_balance( (int)$partner->id ) : ['approved'=>0,'reserved'=>0,'available'=>0];
 
         ob_start(); ?>
         <div class="aff-portal" data-aff-portal>
@@ -59,89 +49,29 @@ class Shortcode {
                 <p>Wkrótce…</p>
             </section>
 
-           <!-- ZAMÓWIENIA -->
-<section id="panel-orders" class="aff-tabpanel" role="tabpanel" data-tab-panel="orders" aria-labelledby="tab-orders" hidden>
-    <h2>Zamówienia</h2>
-    <?php
-    if ( $partner ) {
-        (new \AffiLite\PortalOrders())->render( (int)$partner->id );
-    } else {
-        echo '<p>Twoje zgłoszenie do programu jest <em>oczekujące</em> lub konto nie zostało jeszcze utworzone.</p>';
-    }
-    ?>
-</section>
-
+            <!-- ZAMÓWIENIA -->
+            <section id="panel-orders" class="aff-tabpanel" role="tabpanel" data-tab-panel="orders" aria-labelledby="tab-orders" hidden>
+                <h2>Zamówienia</h2>
+                <?php
+                if ( $partner ) {
+                    (new \AffiLite\PortalOrders())->render( (int)$partner->id );
+                } else {
+                    echo '<p>Twoje zgłoszenie do programu jest <em>oczekujące</em> lub konto nie zostało jeszcze utworzone.</p>';
+                }
+                ?>
+            </section>
 
             <!-- WYPŁATY -->
             <section id="panel-payouts" class="aff-tabpanel" role="tabpanel" data-tab-panel="payouts" aria-labelledby="tab-payouts" hidden>
                 <h2>Wypłaty</h2>
-                <?php if ( $partner ): ?>
-                    <div style="display:flex;gap:12px;margin-bottom:12px;">
-                        <div class="aff-card"><h3>Saldo zatwierdzone</h3><strong><?php echo wc_price($balance['approved']); ?></strong></div>
-                        <div class="aff-card"><h3>Zarezerwowane</h3><strong><?php echo wc_price($balance['reserved']); ?></strong></div>
-                        <div class="aff-card"><h3>Dostępne</h3><strong><?php echo wc_price($balance['available']); ?></strong></div>
-                        <div class="aff-card"><h3>Próg wypłaty</h3><strong><?php echo wc_price($min_payout); ?></strong></div>
-                    </div>
-
-                    <?php if ( $balance['available'] >= $min_payout ): ?>
-                        <form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" class="aff-payout-form">
-                            <?php wp_nonce_field('aff_request_payout', '_aff_nonce'); ?>
-                            <input type="hidden" name="action" value="aff_request_payout">
-
-                            <label>Metoda wypłaty:</label><br>
-                            <select name="method" required>
-                                <?php if ($allowed_methods['paypal']) : ?><option value="paypal">PayPal</option><?php endif; ?>
-                                <?php if ($allowed_methods['bank'])   : ?><option value="bank">Przelew bankowy</option><?php endif; ?>
-                                <?php if ($allowed_methods['crypto']) : ?><option value="crypto">Krypto</option><?php endif; ?>
-                            </select>
-
-                            <div class="aff-paypal" data-paypal style="margin-top:10px;display:none;">
-                                <label>Email PayPal:</label>
-                                <input type="email" name="paypal_email" placeholder="name@example.com">
-                            </div>
-
-                            <div class="aff-bank" data-bank style="margin-top:10px;display:none;">
-                                <label>Nazwa odbiorcy:</label>
-                                <input type="text" name="bank_name" placeholder="Imię i nazwisko / Firma">
-                                <label>IBAN:</label>
-                                <input type="text" name="bank_iban" placeholder="PL...">
-                                <label>BIC/SWIFT (opcjonalnie):</label>
-                                <input type="text" name="bank_bic" placeholder="XXXXXX">
-                            </div>
-
-                            <div class="aff-crypto" data-crypto style="margin-top:10px;display:none;">
-                                <label>Sieć:</label>
-                                <input type="text" name="crypto_network" placeholder="np. TRC20, ERC20">
-                                <label>Adres portfela:</label>
-                                <input type="text" name="crypto_address" placeholder="0x... / T...">
-                            </div>
-
-                            <p style="margin-top:12px;">
-                                <button type="submit" class="button button-primary">Złóż wniosek o wypłatę</button>
-                            </p>
-                        </form>
-                        <script>
-                        (function(){
-                          var root = document.currentScript.closest('.aff-portal');
-                          if(!root) root = document.querySelector('[data-aff-portal]');
-                          var sel = root.querySelector('select[name="method"]');
-                          function update() {
-                            var v = sel.value;
-                            ['paypal','bank','crypto'].forEach(function(n){
-                              var el = root.querySelector('[data-'+n+']');
-                              if (el) el.style.display = (v===n) ? 'block' : 'none';
-                            });
-                          }
-                          sel && (sel.addEventListener('change', update), update());
-                        })();
-                        </script>
-                    <?php else: ?>
-                        <p>Nie osiągnąłeś jeszcze minimalnego progu wypłaty.</p>
-                    <?php endif; ?>
-
-                <?php else: ?>
-                    <p>Twoje zgłoszenie do programu jest <em>oczekujące</em> lub konto nie zostało jeszcze utworzone.</p>
-                <?php endif; ?>
+                <?php
+                if ( $partner ) {
+                    // Cały UI + logika wypłat jest w dedykowanej klasie:
+                    (new \AffiLite\PortalPayouts())->render( (int)$partner->id );
+                } else {
+                    echo '<p>Twoje zgłoszenie do programu jest <em>oczekujące</em> lub konto nie zostało jeszcze utworzone.</p>';
+                }
+                ?>
             </section>
 
             <!-- MATERIAŁY PROMOCYJNE -->
