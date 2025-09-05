@@ -28,7 +28,7 @@ class Tracking {
         $clicks   = $wpdb->prefix . 'aff_clicks';
 
         $partner = $wpdb->get_row( $wpdb->prepare(
-            "SELECT id, status FROM $partners WHERE code = %s LIMIT 1", $code
+            "SELECT id, user_id, status FROM $partners WHERE code = %s LIMIT 1", $code
         ) );
 
         $dest = $this->resolve_destination();
@@ -40,10 +40,15 @@ class Tracking {
         $ttl_days = max(0, (int)($opts['cookie_ttl'] ?? 30));
         $expire   = time() + $ttl_days * DAY_IN_SECONDS;
 
-        // Ustawiamy cookie *raz*, w nowej wersji API
+        // Ustawiamy cookie (secure + httponly)
         setcookie('aff_code', $code, $expire, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
         if ( COOKIEPATH !== SITECOOKIEPATH ) {
             setcookie('aff_code', $code, $expire, SITECOOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+        }
+
+        // NEW: Cross-device — zapisz ostatni kod u zalogowanego użytkownika (jeśli włączone w ustawieniach)
+        if ( ! empty($opts['cross_device']) && is_user_logged_in() ) {
+            update_user_meta( get_current_user_id(), '_aff_last_code', $code );
         }
 
         // Lekki log kliknięcia (hash IP/UA)
@@ -103,13 +108,16 @@ class Tracking {
             return;
         }
 
+        // Stawka: indywidualna partnera lub domyślna z ustawień
         $rate = $partner->commission_rate !== null ? (float)$partner->commission_rate : (float)($opts['commission_rate'] ?? 10);
         $total = (float) $order->get_total();
         $commission = round( $total * ($rate/100), wc_get_price_decimals() );
 
+        // Blokada (np. 14 dni)
         $lock_days = max(0, (int)($opts['lock_days'] ?? 14));
         $locked_until = $lock_days > 0 ? gmdate('Y-m-d H:i:s', time() + $lock_days * DAY_IN_SECONDS) : null;
 
+        // Rekord wstępny: pending (zatwierdzimy po statusie zamówienia)
         $wpdb->insert($referrals, [
             'order_id'          => (int)$order_id,
             'partner_id'        => (int)$partner->id,
@@ -121,6 +129,7 @@ class Tracking {
         ], [ '%d','%d','%f','%f','%s','%s','%s' ]);
 
         if ( $locked_until ) {
+            // Opcjonalnie: zdarzenie do ewentualnego auto-approve (jeśli dodasz handler)
             wp_schedule_single_event( strtotime($locked_until), 'affilite_maybe_approve_referral', [ (int)$order_id ] );
         }
     }

@@ -12,6 +12,8 @@ class Admin {
             (new AdminOrders())->hooks();
             (new AdminPayouts())->hooks(); // już było
             (new AdminPartners())->hooks(); // <-- NOWE (panel Afilianci)
+            (new AdminMaterials())->hooks(); // Materiały promocyjne
+
         }
     }
 
@@ -94,4 +96,5 @@ class Admin {
     public function render_partners_bridge() : void {
         (new AdminPartners())->render();
     }
+    
 }

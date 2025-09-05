@@ -17,7 +17,7 @@ class Shortcode {
             'dashboard' => 'Dashboard',
             'orders'    => 'Zamówienia',
             'payouts'   => 'Wypłaty',
-            'materials' => 'Materiały promocyjne',
+            'materials' => 'Materiały promocyjne', // <-- ta zakładka
             'link'      => 'Generator linku',
             'settings'  => 'Ustawienia',
         ];
@@ -53,16 +53,26 @@ class Shortcode {
                 <?php endforeach; ?>
             </nav>
 
+            <!-- DASHBOARD -->
             <section id="panel-dashboard" class="aff-tabpanel" role="tabpanel" data-tab-panel="dashboard" aria-labelledby="tab-dashboard">
                 <h2>Dashboard</h2>
                 <p>Wkrótce…</p>
             </section>
 
-            <section id="panel-orders" class="aff-tabpanel" role="tabpanel" data-tab-panel="orders" aria-labelledby="tab-orders" hidden>
-                <h2>Zamówienia</h2>
-                <p>Wkrótce…</p>
-            </section>
+           <!-- ZAMÓWIENIA -->
+<section id="panel-orders" class="aff-tabpanel" role="tabpanel" data-tab-panel="orders" aria-labelledby="tab-orders" hidden>
+    <h2>Zamówienia</h2>
+    <?php
+    if ( $partner ) {
+        (new \AffiLite\PortalOrders())->render( (int)$partner->id );
+    } else {
+        echo '<p>Twoje zgłoszenie do programu jest <em>oczekujące</em> lub konto nie zostało jeszcze utworzone.</p>';
+    }
+    ?>
+</section>
 
+
+            <!-- WYPŁATY -->
             <section id="panel-payouts" class="aff-tabpanel" role="tabpanel" data-tab-panel="payouts" aria-labelledby="tab-payouts" hidden>
                 <h2>Wypłaty</h2>
                 <?php if ( $partner ): ?>
@@ -134,11 +144,19 @@ class Shortcode {
                 <?php endif; ?>
             </section>
 
+            <!-- MATERIAŁY PROMOCYJNE -->
             <section id="panel-materials" class="aff-tabpanel" role="tabpanel" data-tab-panel="materials" aria-labelledby="tab-materials" hidden>
                 <h2>Materiały promocyjne</h2>
-                <p>Wkrótce…</p>
+                <?php
+                if ( class_exists('\\AffiLite\\Materials') ) {
+                    (new \AffiLite\Materials())->render_for_affiliate();
+                } else {
+                    echo '<p>Brak modułu materiałów.</p>';
+                }
+                ?>
             </section>
 
+            <!-- GENERATOR LINKU -->
             <section id="panel-link" class="aff-tabpanel" role="tabpanel" data-tab-panel="link" aria-labelledby="tab-link" hidden>
                 <h2>Generator linku</h2>
                 <?php if ( $partner ): ?>
@@ -152,12 +170,13 @@ class Shortcode {
                     </form>
 
                     <p><strong>Twój link:</strong> <input type="text" id="aff-out" readonly style="width:100%"></p>
-                    <p class="aff-hint">Uwaga: tylko adresy w tej sameej domenie są dozwolone. <code>?to=</code> ścieżka względna, <code>?url=</code> pełny adres do tej samej domeny.</p>
+                    <p class="aff-hint">Uwaga: tylko adresy w tej samej domenie są dozwolone. <code>?to=</code> ścieżka względna, <code>?url=</code> pełny adres do tej samej domeny.</p>
                 <?php else: ?>
                     <p>Twoje zgłoszenie do programu jest <em>oczekujące</em> lub konto nie zostało jeszcze utworzone.</p>
                 <?php endif; ?>
             </section>
 
+            <!-- USTAWIENIA -->
             <section id="panel-settings" class="aff-tabpanel" role="tabpanel" data-tab-panel="settings" aria-labelledby="tab-settings" hidden>
                 <h2>Ustawienia</h2>
                 <p>Wkrótce…</p>
