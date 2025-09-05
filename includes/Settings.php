@@ -28,7 +28,7 @@ class Settings {
                 'commission_day'  => 1000.0,
             ],
 
-            // NOWE: Flagi widoczności modułów (bez UI – wartości domyślne)
+            // Flagi widoczności modułów (domyślnie bez UI; „Materiały” pokażemy w UI)
             'flags' => [
                 'show_orders'     => true,
                 'show_payouts'    => true,
@@ -36,13 +36,13 @@ class Settings {
                 'show_link'       => true,
             ],
 
-            // NOWE: Security (bez UI – wartości domyślne)
+            // Security (bez UI – wartości domyślne)
             'security' => [
-                'strict_cookies'      => true, // ustawia aff_code jako httponly/secure/samesite=Lax (jeśli możliwe)
+                'strict_cookies'      => true, // aff_code jako httponly/secure/samesite=Lax (jeśli możliwe)
                 'block_self_purchase' => true, // dodatkowa flaga (poza allow_self_purchase z UI)
             ],
 
-            // NOWE: Powiadomienia e-mail (bez UI – wartości domyślne)
+            // Powiadomienia e-mail (domyślnie ON)
             'notify_admin' => [
                 'new_payout' => true, // e-mail do admina przy nowym wniosku o wypłatę
             ],
@@ -65,6 +65,10 @@ class Settings {
 
     public function sanitize($input) : array {
         $d = self::defaults();
+        // Zacznijmy od domyślnych, ale zachowajmy to, co już jest w DB (ważne dla kluczy, których nie pokazujemy w UI)
+        $stored = get_option(self::OPTION_KEY, $d);
+        if (!is_array($stored)) { $stored = $d; }
+
         $o = $d;
 
         // Liczbowe / stringi
@@ -97,20 +101,23 @@ class Settings {
             'commission_day' => max(0, (float)($input['fraud_thresholds']['commission_day'] ?? $d['fraud_thresholds']['commission_day'])),
         ];
 
-        // NOWE: Flagi modułów (brak UI – jeśli coś przyjdzie, łączymy z defaults; jeśli nie, zostają defaults)
-        $in_flags = isset($input['flags']) && is_array($input['flags']) ? (array)$input['flags'] : [];
-        $o['flags'] = array_merge($d['flags'], array_map('boolval', $in_flags));
+        // Flagi – zachowuj dotychczasowe wartości dla nieobsługiwanych w UI,
+        // ale „show_materials” ustawiamy explicite wg checkboxa (można wyłączyć).
+        $flags = array_merge($d['flags'], is_array($stored['flags'] ?? null) ? $stored['flags'] : []);
+        $flags['show_materials'] = !empty($input['flags']['show_materials']); // ← to jest w UI
+        $o['flags'] = $flags;
 
-        // NOWE: Security (brak UI – jak wyżej)
-        $in_sec = isset($input['security']) && is_array($input['security']) ? (array)$input['security'] : [];
-        $o['security'] = array_merge($d['security'], array_map('boolval', $in_sec));
+        // Security – u nas bez UI; zachowaj dotychczasowe
+        $o['security'] = array_merge($d['security'], is_array($stored['security'] ?? null) ? $stored['security'] : []);
 
-        // NOWE: Powiadomienia (brak UI – jak wyżej)
-        $in_admin = isset($input['notify_admin']) && is_array($input['notify_admin']) ? (array)$input['notify_admin'] : [];
-        $o['notify_admin'] = array_merge($d['notify_admin'], array_map('boolval', $in_admin));
+        // Powiadomienia – ustaw explicite po checkboxach, aby dało się je wyłączyć.
+        $notify_admin = array_merge($d['notify_admin'], is_array($stored['notify_admin'] ?? null) ? $stored['notify_admin'] : []);
+        $notify_admin['new_payout'] = !empty($input['notify_admin']['new_payout']);
+        $o['notify_admin'] = $notify_admin;
 
-        $in_aff = isset($input['notify_affiliate']) && is_array($input['notify_affiliate']) ? (array)$input['notify_affiliate'] : [];
-        $o['notify_affiliate'] = array_merge($d['notify_affiliate'], array_map('boolval', $in_aff));
+        $notify_aff = array_merge($d['notify_affiliate'], is_array($stored['notify_affiliate'] ?? null) ? $stored['notify_affiliate'] : []);
+        $notify_aff['payout_status'] = !empty($input['notify_affiliate']['payout_status']);
+        $o['notify_affiliate'] = $notify_aff;
 
         return $o;
     }
@@ -187,6 +194,20 @@ class Settings {
         printf('<label>Prowizja/dzień: <input name="%1$s[fraud_thresholds][commission_day]" type="number" min="0" step="0.01" value="%2$s"></label><br>',
             esc_attr(self::OPTION_KEY), esc_attr($o['fraud_thresholds']['commission_day']));
         $this->card('Progi anty-fraud', ob_get_clean());
+
+        // NOWE: Widoczność portalu (opcjonalnie)
+        ob_start();
+        printf('<label><input type="checkbox" name="%1$s[flags][show_materials]" %2$s> Pokaż zakładkę „Materiały promocyjne”</label><br>',
+            esc_attr(self::OPTION_KEY), checked(!empty($o['flags']['show_materials']), true, false));
+        $this->card('Widoczność portalu', ob_get_clean());
+
+        // NOWE: Powiadomienia
+        ob_start();
+        printf('<label><input type="checkbox" name="%1$s[notify_admin][new_payout]" %2$s> Powiadom admina o nowym wniosku o wypłatę</label><br>',
+            esc_attr(self::OPTION_KEY), checked(!empty($o['notify_admin']['new_payout']), true, false));
+        printf('<label><input type="checkbox" name="%1$s[notify_affiliate][payout_status]" %2$s> Powiadom afilianta o zmianie statusu wypłaty</label><br>',
+            esc_attr(self::OPTION_KEY), checked(!empty($o['notify_affiliate']['payout_status']), true, false));
+        $this->card('Powiadomienia', ob_get_clean());
 
         echo '</div>';
         submit_button();
