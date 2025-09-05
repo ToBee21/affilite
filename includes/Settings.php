@@ -1,4 +1,4 @@
-<?php
+<?php 
 namespace AffiLite;
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -8,16 +8,47 @@ class Settings {
 
     public static function defaults() : array {
         return [
+            // Core
             'commission_rate' => 10,
             'lock_days'       => 14,
             'cookie_ttl'      => 30,
             'join_mode'       => 'auto',   // 'auto' | 'manual'
             'attribution'     => 'last',   // 'last' | 'first'
             'cross_device'    => true,
-            'allow_self_purchase' => false, // NOWE: blokuj samozakup (domyślnie)
-            'payout_methods'  => [ 'paypal' => true, 'bank' => true, 'crypto' => true ],
-            'min_payout'      => 100.0,
-            'fraud_thresholds'=> [ 'clicks_day' => 500, 'conv_day' => 20, 'commission_day' => 1000.0 ],
+
+            // Bezpieczeństwo / zachowanie programu
+            'allow_self_purchase' => false, // UI: jeśli true, pozwala na samozakup (domyślnie: NIE)
+            'payout_methods'      => [ 'paypal' => true, 'bank' => true, 'crypto' => true ],
+            'min_payout'          => 100.0,
+
+            // Progi anty-fraud
+            'fraud_thresholds'    => [
+                'clicks_day'      => 500,
+                'conv_day'        => 20,
+                'commission_day'  => 1000.0,
+            ],
+
+            // NOWE: Flagi widoczności modułów (bez UI – wartości domyślne)
+            'flags' => [
+                'show_orders'     => true,
+                'show_payouts'    => true,
+                'show_materials'  => true,
+                'show_link'       => true,
+            ],
+
+            // NOWE: Security (bez UI – wartości domyślne)
+            'security' => [
+                'strict_cookies'      => true, // ustawia aff_code jako httponly/secure/samesite=Lax (jeśli możliwe)
+                'block_self_purchase' => true, // dodatkowa flaga (poza allow_self_purchase z UI)
+            ],
+
+            // NOWE: Powiadomienia e-mail (bez UI – wartości domyślne)
+            'notify_admin' => [
+                'new_payout' => true, // e-mail do admina przy nowym wniosku o wypłatę
+            ],
+            'notify_affiliate' => [
+                'payout_status' => true, // e-mail do afilianta przy zmianie statusu wypłaty
+            ],
         ];
     }
 
@@ -26,6 +57,7 @@ class Settings {
         if (!is_array($opts)) {
             add_option(self::OPTION_KEY, self::defaults());
         } else {
+            // delikatny merge – nowe klucze z defaults, stare wartości użytkownika zachowane
             update_option(self::OPTION_KEY, array_replace_recursive(self::defaults(), $opts));
         }
         register_setting('affilite_settings', self::OPTION_KEY, [ $this, 'sanitize' ]);
@@ -35,6 +67,7 @@ class Settings {
         $d = self::defaults();
         $o = $d;
 
+        // Liczbowe / stringi
         $o['commission_rate'] = max(0, min(100, (int)($input['commission_rate'] ?? $d['commission_rate'])));
         $o['lock_days']       = max(0, (int)($input['lock_days'] ?? $d['lock_days']));
         $o['cookie_ttl']      = max(0, (int)($input['cookie_ttl'] ?? $d['cookie_ttl']));
@@ -45,22 +78,39 @@ class Settings {
         $a = $input['attribution'] ?? $d['attribution'];
         $o['attribution'] = in_array($a, ['last','first'], true) ? $a : 'last';
 
-        $o['cross_device'] = !empty($input['cross_device']);
+        // Booleany z UI
+        $o['cross_device']        = !empty($input['cross_device']);
         $o['allow_self_purchase'] = !empty($input['allow_self_purchase']);
 
+        // Wypłaty (UI)
         $o['payout_methods'] = [
             'paypal' => !empty($input['payout_methods']['paypal']),
             'bank'   => !empty($input['payout_methods']['bank']),
             'crypto' => !empty($input['payout_methods']['crypto']),
         ];
-
         $o['min_payout'] = max(0, (float)($input['min_payout'] ?? $d['min_payout']));
 
+        // Progi anty-fraud (UI)
         $o['fraud_thresholds'] = [
             'clicks_day'     => max(0, (int)($input['fraud_thresholds']['clicks_day'] ?? $d['fraud_thresholds']['clicks_day'])),
             'conv_day'       => max(0, (int)($input['fraud_thresholds']['conv_day'] ?? $d['fraud_thresholds']['conv_day'])),
             'commission_day' => max(0, (float)($input['fraud_thresholds']['commission_day'] ?? $d['fraud_thresholds']['commission_day'])),
         ];
+
+        // NOWE: Flagi modułów (brak UI – jeśli coś przyjdzie, łączymy z defaults; jeśli nie, zostają defaults)
+        $in_flags = isset($input['flags']) && is_array($input['flags']) ? (array)$input['flags'] : [];
+        $o['flags'] = array_merge($d['flags'], array_map('boolval', $in_flags));
+
+        // NOWE: Security (brak UI – jak wyżej)
+        $in_sec = isset($input['security']) && is_array($input['security']) ? (array)$input['security'] : [];
+        $o['security'] = array_merge($d['security'], array_map('boolval', $in_sec));
+
+        // NOWE: Powiadomienia (brak UI – jak wyżej)
+        $in_admin = isset($input['notify_admin']) && is_array($input['notify_admin']) ? (array)$input['notify_admin'] : [];
+        $o['notify_admin'] = array_merge($d['notify_admin'], array_map('boolval', $in_admin));
+
+        $in_aff = isset($input['notify_affiliate']) && is_array($input['notify_affiliate']) ? (array)$input['notify_affiliate'] : [];
+        $o['notify_affiliate'] = array_merge($d['notify_affiliate'], array_map('boolval', $in_aff));
 
         return $o;
     }

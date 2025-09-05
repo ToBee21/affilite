@@ -36,17 +36,43 @@ class Tracking {
             $this->redirect($dest);
         }
 
-        $opts = get_option(Settings::OPTION_KEY, Settings::defaults());
+        $opts     = get_option(Settings::OPTION_KEY, Settings::defaults());
         $ttl_days = max(0, (int)($opts['cookie_ttl'] ?? 30));
         $expire   = time() + $ttl_days * DAY_IN_SECONDS;
 
-        // Ustawiamy cookie (secure + httponly)
-        setcookie('aff_code', $code, $expire, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
-        if ( COOKIEPATH !== SITECOOKIEPATH ) {
-            setcookie('aff_code', $code, $expire, SITECOOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+        // Strict cookies (httponly/secure/samesite) wg flagi
+        $security   = $opts['security'] ?? [];
+        $use_strict = !empty($security['strict_cookies']);
+
+        if ( $use_strict && PHP_VERSION_ID >= 70300 ) {
+            // API z tablicą opcji
+            setcookie('aff_code', $code, [
+                'expires'  => $expire,
+                'path'     => COOKIEPATH ?: '/',
+                'domain'   => COOKIE_DOMAIN,
+                'secure'   => is_ssl(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            if ( COOKIEPATH !== SITECOOKIEPATH ) {
+                setcookie('aff_code', $code, [
+                    'expires'  => $expire,
+                    'path'     => SITECOOKIEPATH ?: '/',
+                    'domain'   => COOKIE_DOMAIN,
+                    'secure'   => is_ssl(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            }
+        } else {
+            // Fallback
+            setcookie('aff_code', $code, $expire, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+            if ( COOKIEPATH !== SITECOOKIEPATH ) {
+                setcookie('aff_code', $code, $expire, SITECOOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+            }
         }
 
-        // NEW: Cross-device — zapisz ostatni kod u zalogowanego użytkownika (jeśli włączone w ustawieniach)
+        // Cross-device — zapisz ostatni kod u zalogowanego użytkownika (jeśli włączone)
         if ( ! empty($opts['cross_device']) && is_user_logged_in() ) {
             update_user_meta( get_current_user_id(), '_aff_last_code', $code );
         }
@@ -87,7 +113,9 @@ class Tracking {
         if ( ! $partner || $partner->status !== 'approved' ) { return; }
 
         $opts = get_option(Settings::OPTION_KEY, Settings::defaults());
-        $deny_self = empty($opts['allow_self_purchase']); // domyślnie blokujemy samozakup
+
+        // blokada samozakupu: security.flag && NIE zaznaczono "pozwól" w UI
+        $deny_self = !empty(($opts['security']['block_self_purchase'] ?? true)) && empty($opts['allow_self_purchase']);
 
         // Samozakup?
         $order_user_id   = (int) $order->get_user_id();
