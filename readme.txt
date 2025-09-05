@@ -13,6 +13,6 @@ Minimalny, nowoczesny szkielet wtyczki afiliacyjnej dla WooCommerce.
 2. Aktywuj.
 3. Przejdź do AffiLite → Ustawienia, ustaw stawkę prowizji itd.
 4. Utwórz stronę i wstaw shortcode [aff_portal].
-
+5. Dodatkowa opcja Bonusy
 == Changelog ==
 = 0.1.0 = Initial skeleton (2025-09-02)
